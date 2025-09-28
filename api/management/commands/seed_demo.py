@@ -1,23 +1,18 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth import get_user_model
 from api.models import Product
 
-User = get_user_model()
 
 class Command(BaseCommand):
-    help = "Create demo user and seed products"
+    help = "Seed database with sample products"
 
-    def handle(self, *args, **options):
-        if not User.objects.filter(username="demo").exists():
-            User.objects.create_user("demo", password="password123", email="demo@example.com")
-            self.stdout.write(self.style.SUCCESS("Created user demo / password123"))
-        else:
-            self.stdout.write("User demo exists")
+    def handle(self, *args, **kwargs):
+        products = [
+            {"name": "Laptop", "price": 250000, "description": "Core i7, 16GB RAM"},
+            {"name": "Smartphone", "price": 120000, "description": "Android 13, 128GB"},
+            {"name": "Headphones", "price": 15000, "description": "Noise cancelling"},
+        ]
 
-        if Product.objects.count() == 0:
-            Product.objects.create(name="Alpha", description="First product", price=10.0)
-            Product.objects.create(name="Beta", description="Second product", price=20.0)
-            Product.objects.create(name="Gamma", description="Third product", price=30.0)
-            self.stdout.write(self.style.SUCCESS("Seeded 3 products"))
-        else:
-            self.stdout.write("Products already present")
+        for p in products:
+            Product.objects.get_or_create(name=p["name"], defaults=p)
+
+        self.stdout.write(self.style.SUCCESS("Products seeded successfully!"))

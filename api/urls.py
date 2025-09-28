@@ -1,14 +1,11 @@
 from django.urls import path
-from .views import (
-    UserListAPIView,
-    UserDetailAPIView,
-    UserMeAPIView,
-    UserRegisterAPIView,
-)
+from .views import  RegisterView, ProductListCreateView, ProductDetailView, ProductCreateView, LoginView
+
 
 urlpatterns = [
-    path("users/", UserListAPIView.as_view(), name="users_list"),
-    path("users/<int:pk>/", UserDetailAPIView.as_view(), name="user_detail"),
-    path("users/me/", UserMeAPIView.as_view(), name="user_me"),
-    path("register/", UserRegisterAPIView.as_view(), name="user_register"),
+    path("register/", RegisterView.as_view(), name="user_register"),
+    path('login/', LoginView.as_view(), name='login'),
+    path('products/', ProductListCreateView.as_view(), name='product_list_create'),
+    path("products/<int:pk>/", ProductDetailView.as_view(), name="product_detail"),
+    path('products/add/', ProductCreateView.as_view(), name='add-product'),
 ]

@@ -2,68 +2,79 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status, generics
 from django.shortcuts import get_object_or_404
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model,authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from .serializers import UserSerializer, RegisterSerializer
+from .models import Product
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, ProductSerializer
 from utils.cache_helpers import cache_response
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
 
-class UserListAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
 
-    @cache_response(ttl=60)
-    def get(self, request, *args, **kwargs):
-        qs = User.objects.all().order_by("-date_joined")
-        serializer = UserSerializer(qs, many=True)
-        return Response(serializer.data)
+class RegisterView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer
 
-
-class UserDetailAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    @cache_response(ttl=30)
-    def get(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User, pk=pk)
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-
-
-class UserMeAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    @cache_response(ttl=20)
-    def get(self, request, *args, **kwargs):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
-
-
-class UserRegisterAPIView(generics.CreateAPIView):
-    permission_classes = [permissions.AllowAny]  # anyone can register
-
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
 
-            # generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "detail": f"🎉 Welcome {user.username}, your account has been created!",
+            "tokens": {
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+            }
+        }, status=status.HTTP_201_CREATED)
+    
+
+
+class LoginView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)  
+        serializer.is_valid(raise_exception=True)
+
+        username = serializer.validated_data["username"]
+        password = serializer.validated_data["password"]
+
+        print("DEBUG ->", username, password)
+
+        user = authenticate(username=username, password=password)
+
+        if user is not None:
             refresh = RefreshToken.for_user(user)
+            return Response({
+                "detail": f"🎉 Welcome back, {user.username}!",
+                "tokens": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                }
+            }, status=status.HTTP_200_OK)
 
-            return Response(
-                {
-                    "message": "User registered successfully ✅",
-                    "user": UserSerializer(user).data,
-                    "tokens": {
-                        "refresh": str(refresh),
-                        "access": str(refresh.access_token),
-                    },
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "❌ Invalid credentials, try again."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
-    # 👇 helps Swagger show request body fields
-    def get_serializer_class(self):
-        return RegisterSerializer
+class ProductListCreateView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class ProductCreateView(generics.CreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated] 
